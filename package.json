@@ -1,0 +1,21 @@
+{
+  "name": "fortune-rush",
+  "private": true,
+  "workspaces": [
+    "apps/*"
+  ],
+  "scripts": {
+    "dev": "concurrently \"npm run dev:worker\" \"npm run dev:web\"",
+    "dev:web": "npm run dev -w apps/web",
+    "dev:worker": "npm run dev -w apps/worker",
+    "build": "npm run build -w apps/worker && npm run build -w apps/web",
+    "build:web": "npm run build -w apps/web",
+    "build:worker": "npm run build -w apps/worker",
+    "lint": "npm run lint -w apps/web && npm run lint -w apps/worker",
+    "test": "npm run test -w apps/worker"
+  },
+  "devDependencies": {
+    "concurrently": "^8.2.2",
+    "typescript": "^5.3.3"
+  }
+}
