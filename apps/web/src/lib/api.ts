@@ -1,8 +1,10 @@
 /**
- * API client for Fortune Rush backend
+ * API client for Celestia backend
  */
 
-const API_BASE = '/api';
+// Use environment variable in production, fallback to /api for dev
+const API_BASE = import.meta.env.VITE_API_URL || '/api';
+
 
 interface CreateRoomParams {
     stake: number;

@@ -1,7 +1,11 @@
-name = "fortune-rush-api"
+name = "celestia-api"
 main = "src/index.ts"
 compatibility_date = "2024-01-01"
 compatibility_flags = ["nodejs_compat"]
+
+# Production settings
+[vars]
+ENVIRONMENT = "production"
 
 [durable_objects]
 bindings = [
@@ -12,6 +16,7 @@ bindings = [
 tag = "v1"
 new_classes = ["GameRoom"]
 
+# Development settings
 [dev]
 port = 8787
 local_protocol = "http"

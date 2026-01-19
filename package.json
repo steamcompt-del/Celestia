@@ -1,5 +1,5 @@
 {
-  "name": "fortune-rush",
+  "name": "celestia",
   "private": true,
   "workspaces": [
     "apps/*"
@@ -11,6 +11,8 @@
     "build": "npm run build -w apps/worker && npm run build -w apps/web",
     "build:web": "npm run build -w apps/web",
     "build:worker": "npm run build -w apps/worker",
+    "deploy": "npm run deploy:worker",
+    "deploy:worker": "npm run deploy -w apps/worker",
     "lint": "npm run lint -w apps/web && npm run lint -w apps/worker",
     "test": "npm run test -w apps/worker"
   },
