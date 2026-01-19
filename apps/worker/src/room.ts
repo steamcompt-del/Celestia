@@ -496,8 +496,11 @@ export class GameRoom implements DurableObject {
         const playerId = request.headers.get('x-player-id') || url.searchParams.get('playerId');
         const playerSecret = request.headers.get('x-player-secret') || url.searchParams.get('playerSecret');
 
+        console.log('[WS] Connecting with credentials:', { playerId, playerSecret: playerSecret ? '***' : null });
+
         // Load state BEFORE accepting WebSocket
         await this.loadState();
+        console.log('[WS] State loaded, players:', this.roomState?.players.map(p => ({ id: p.id, name: p.nickname })));
 
         const pair = new WebSocketPair();
         const [client, server] = Object.values(pair) as [WebSocket, WebSocket];
@@ -508,10 +511,14 @@ export class GameRoom implements DurableObject {
         // Register session synchronously
         if (playerId && playerSecret && this.roomState) {
             const player = this.validatePlayer(playerId, playerSecret);
+            console.log('[WS] Player validation result:', player ? 'VALID' : 'INVALID');
             if (player) {
                 this.sessions.set(server, playerId);
                 player.connected = true;
+                console.log('[WS] Player connected:', player.nickname);
             }
+        } else {
+            console.log('[WS] Missing credentials or state');
         }
 
         // Set up event listeners
@@ -539,6 +546,7 @@ export class GameRoom implements DurableObject {
         // Send current state immediately (synchronously after accept)
         const publicState = this.getPublicState();
         if (publicState) {
+            console.log('[WS] Sending initial state, connected players:', publicState.players.filter(p => p.connected).map(p => p.nickname));
             server.send(JSON.stringify({ type: 'STATE_UPDATE', payload: publicState }));
         }
 
