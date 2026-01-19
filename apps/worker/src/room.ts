@@ -486,7 +486,7 @@ export class GameRoom implements DurableObject {
 
     /**
      * Handle WebSocket connection
-     * Uses classic event listeners (hibernation API has issues in local dev)
+     * Loads state first, then accepts connection
      */
     private async handleWebSocket(request: Request): Promise<Response> {
         const url = new URL(request.url);
@@ -495,32 +495,21 @@ export class GameRoom implements DurableObject {
         const playerId = request.headers.get('x-player-id') || url.searchParams.get('playerId');
         const playerSecret = request.headers.get('x-player-secret') || url.searchParams.get('playerSecret');
 
+        // Load state BEFORE accepting WebSocket
+        await this.loadState();
+
         const pair = new WebSocketPair();
         const [client, server] = Object.values(pair) as [WebSocket, WebSocket];
 
         // Accept the WebSocket connection
         server.accept();
 
-        // Load state first to validate credentials
-        await this.loadState();
-
-        // Store session info and mark player connected
-        if (playerId && playerSecret) {
+        // Register session synchronously
+        if (playerId && playerSecret && this.roomState) {
             const player = this.validatePlayer(playerId, playerSecret);
             if (player) {
                 this.sessions.set(server, playerId);
                 player.connected = true;
-                await this.saveAndBroadcast();
-            }
-        }
-
-        // Send current state immediately
-        const publicState = this.getPublicState();
-        if (publicState) {
-            try {
-                server.send(JSON.stringify({ type: 'STATE_UPDATE', payload: publicState }));
-            } catch (e) {
-                console.error('Failed to send initial state:', e);
             }
         }
 
@@ -529,21 +518,31 @@ export class GameRoom implements DurableObject {
             console.log('WS message received:', event.data);
         });
 
-        server.addEventListener('close', async () => {
+        server.addEventListener('close', () => {
             const pid = this.sessions.get(server);
             if (pid && this.roomState) {
                 const player = this.roomState.players.find(p => p.id === pid);
                 if (player) {
                     player.connected = false;
-                    await this.saveAndBroadcast();
                 }
             }
             this.sessions.delete(server);
+            // Save in background
+            this.saveAndBroadcast().catch(console.error);
         });
 
         server.addEventListener('error', (e) => {
             console.error('WebSocket error:', e);
         });
+
+        // Send current state immediately (synchronously after accept)
+        const publicState = this.getPublicState();
+        if (publicState) {
+            server.send(JSON.stringify({ type: 'STATE_UPDATE', payload: publicState }));
+        }
+
+        // Save the connected status in background
+        this.saveAndBroadcast().catch(console.error);
 
         return new Response(null, {
             status: 101,
