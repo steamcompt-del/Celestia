@@ -486,7 +486,7 @@ export class GameRoom implements DurableObject {
 
     /**
      * Handle WebSocket connection
-     * Supports credentials via query params (browsers can't set custom headers on WS)
+     * Uses classic event listeners (hibernation API has issues in local dev)
      */
     private async handleWebSocket(request: Request): Promise<Response> {
         const url = new URL(request.url);
@@ -496,9 +496,10 @@ export class GameRoom implements DurableObject {
         const playerSecret = request.headers.get('x-player-secret') || url.searchParams.get('playerSecret');
 
         const pair = new WebSocketPair();
-        const [client, server] = Object.values(pair);
+        const [client, server] = Object.values(pair) as [WebSocket, WebSocket];
 
-        this.state.acceptWebSocket(server);
+        // Accept the WebSocket connection
+        server.accept();
 
         // Load state first to validate credentials
         await this.loadState();
@@ -516,46 +517,38 @@ export class GameRoom implements DurableObject {
         // Send current state immediately
         const publicState = this.getPublicState();
         if (publicState) {
-            server.send(JSON.stringify({ type: 'STATE_UPDATE', payload: publicState }));
+            try {
+                server.send(JSON.stringify({ type: 'STATE_UPDATE', payload: publicState }));
+            } catch (e) {
+                console.error('Failed to send initial state:', e);
+            }
         }
+
+        // Set up event listeners
+        server.addEventListener('message', (event) => {
+            console.log('WS message received:', event.data);
+        });
+
+        server.addEventListener('close', async () => {
+            const pid = this.sessions.get(server);
+            if (pid && this.roomState) {
+                const player = this.roomState.players.find(p => p.id === pid);
+                if (player) {
+                    player.connected = false;
+                    await this.saveAndBroadcast();
+                }
+            }
+            this.sessions.delete(server);
+        });
+
+        server.addEventListener('error', (e) => {
+            console.error('WebSocket error:', e);
+        });
 
         return new Response(null, {
             status: 101,
             webSocket: client,
         });
-    }
-
-    /**
-     * Handle WebSocket messages and events
-     */
-    async webSocketMessage(ws: WebSocket, message: string | ArrayBuffer): Promise<void> {
-        // For now, we don't process incoming WS messages (all actions via REST)
-        // But this could be extended for real-time actions
-        console.log('WS message received:', message);
-    }
-
-    /**
-     * Handle WebSocket close
-     */
-    async webSocketClose(ws: WebSocket): Promise<void> {
-        const playerId = this.sessions.get(ws);
-        if (playerId && this.roomState) {
-            const player = this.roomState.players.find(p => p.id === playerId);
-            if (player) {
-                player.connected = false;
-                this.logEvent('PLAYER_DISCONNECTED', { playerId });
-                await this.saveAndBroadcast();
-            }
-        }
-        this.sessions.delete(ws);
-    }
-
-    /**
-     * Handle WebSocket error
-     */
-    async webSocketError(ws: WebSocket, error: unknown): Promise<void> {
-        console.error('WebSocket error:', error);
-        await this.webSocketClose(ws);
     }
 
     /**
