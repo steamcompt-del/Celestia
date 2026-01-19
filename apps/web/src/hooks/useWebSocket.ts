@@ -23,12 +23,28 @@ export function useWebSocket({ roomToken, playerId, playerSecret, onStateUpdate 
         if (wsRef.current?.readyState === WebSocket.OPEN) return;
 
         // Build WebSocket URL
-        // In development, connect directly to worker (8787)
-        // In production, use same host
-        const isDev = window.location.port === '5173';
-        const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-        const host = isDev ? 'localhost:8787' : window.location.host;
-        let url = `${protocol}//${host}/api/rooms/${roomToken}/ws`;
+        // Use VITE_API_URL if set (production), otherwise dev settings
+        const apiUrl = import.meta.env.VITE_API_URL;
+        let wsHost: string;
+        let wsProtocol: string;
+
+        if (apiUrl) {
+            // Production: parse host from VITE_API_URL
+            // e.g., "https://celestia-game-api.steamcompt.workers.dev/api" -> "celestia-game-api.steamcompt.workers.dev"
+            const url = new URL(apiUrl);
+            wsHost = url.host;
+            wsProtocol = url.protocol === 'https:' ? 'wss:' : 'ws:';
+        } else if (window.location.port === '5173') {
+            // Development: connect directly to worker (8787)
+            wsHost = 'localhost:8787';
+            wsProtocol = 'ws:';
+        } else {
+            // Fallback: use same host
+            wsHost = window.location.host;
+            wsProtocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+        }
+
+        let url = `${wsProtocol}//${wsHost}/api/rooms/${roomToken}/ws`;
 
         // Add credentials as query params (since WS doesn't support custom headers in browser)
         if (playerId && playerSecret) {
