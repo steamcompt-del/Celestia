@@ -488,7 +488,7 @@ export class GameRoom implements DurableObject {
      * Handle WebSocket connection
      * Supports credentials via query params (browsers can't set custom headers on WS)
      */
-    private handleWebSocket(request: Request): Response {
+    private async handleWebSocket(request: Request): Promise<Response> {
         const url = new URL(request.url);
 
         // Try headers first, then query params (for browser compatibility)
@@ -500,13 +500,16 @@ export class GameRoom implements DurableObject {
 
         this.state.acceptWebSocket(server);
 
+        // Load state first to validate credentials
+        await this.loadState();
+
         // Store session info and mark player connected
         if (playerId && playerSecret) {
             const player = this.validatePlayer(playerId, playerSecret);
             if (player) {
                 this.sessions.set(server, playerId);
                 player.connected = true;
-                this.saveAndBroadcast();
+                await this.saveAndBroadcast();
             }
         }
 
