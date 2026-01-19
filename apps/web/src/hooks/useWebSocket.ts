@@ -23,8 +23,11 @@ export function useWebSocket({ roomToken, playerId, playerSecret, onStateUpdate 
         if (wsRef.current?.readyState === WebSocket.OPEN) return;
 
         // Build WebSocket URL
+        // In development, connect directly to worker (8787)
+        // In production, use same host
+        const isDev = window.location.port === '5173';
         const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-        const host = window.location.host;
+        const host = isDev ? 'localhost:8787' : window.location.host;
         let url = `${protocol}//${host}/api/rooms/${roomToken}/ws`;
 
         // Add credentials as query params (since WS doesn't support custom headers in browser)
