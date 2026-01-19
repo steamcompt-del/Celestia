@@ -39,7 +39,8 @@ export class GameRoom implements DurableObject {
      */
     private async loadState(): Promise<RoomState | null> {
         if (this.roomState) return this.roomState;
-        this.roomState = await this.state.storage.get<RoomState>('room');
+        const stored = await this.state.storage.get<RoomState>('room');
+        this.roomState = stored ?? null;
         return this.roomState;
     }
 
